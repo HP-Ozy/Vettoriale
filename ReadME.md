@@ -10,6 +10,7 @@ Permette di costruire interattivamente un piano degli assi cartesiani, popolare 
 
 
 ![Registrazione 2026-03-10 150349](https://github.com/user-attachments/assets/e3966cc8-6fa9-42ac-a5e8-f9a1b4b76075)
+![Registrazione 2026-03-10 153012](https://github.com/user-attachments/assets/9a36154d-63b9-412e-b19a-66658e5809c9)
 
 
 
