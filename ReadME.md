@@ -1,4 +1,4 @@
-# 📐 Piano degli Assi — Visualizzatore Vettoriale
+# Vettoriale
 
 Un'app web locale in Python per creare e visualizzare vettori in uno spazio 2D e 3D, con supporto alle principali operazioni dell'algebra lineare.
 
