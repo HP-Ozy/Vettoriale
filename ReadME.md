@@ -20,8 +20,4 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Apre automaticamente → **http://localhost:8501**
-
----
-
 
