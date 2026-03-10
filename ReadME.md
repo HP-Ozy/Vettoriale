@@ -40,12 +40,4 @@ Apre automaticamente → **http://localhost:8501**
 
 ---
 
-## Struttura del progetto
 
-```
-vettori-app/
-├── app.py            ← Interfaccia Streamlit
-├── vector_space.py   ← Logica vettoriale e generazione grafico
-├── requirements.txt  ← Dipendenze
-└── README.md
-```
