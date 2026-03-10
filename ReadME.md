@@ -23,3 +23,8 @@ Permette di costruire interattivamente un piano degli assi cartesiani, popolare 
 pip install -r requirements.txt
 streamlit run app.py
 ```
+## Licenza
+
+Distribuito sotto licenza [GPL v3](LICENSE).  
+Puoi fare fork e modificare liberamente, ma le versioni derivate devono
+mantenere la stessa licenza e citare l'autore originale.
