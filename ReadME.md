@@ -17,17 +17,6 @@ Le funzionalità principali sono:
 - **Aggiunta del risultato** — il vettore risultante da un'operazione può essere aggiunto direttamente al piano
 - **Gestione vettori** — rimozione singola o totale
 
----
-
-## Stack tecnico
-
-| Libreria | Ruolo |
-|---|---|
-| **Streamlit** | Interfaccia web locale (no HTML/CSS) |
-| **Plotly** | Grafici 2D/3D interattivi |
-| **NumPy** | Calcolo vettoriale |
-
----
 
 ## Avvio
 
