@@ -7,7 +7,7 @@ Algoritmi disponibili:
 """
 
 import numpy as np
-from typing import Dict, List, Literal, Tuple
+from typing import Dict, List, Literal, Optional, Tuple
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import StandardScaler
@@ -27,6 +27,9 @@ class DimensionReducer:
         self.n_components = n_components
         self._scaler = StandardScaler()
         self._model = None
+        # Frazione di varianza preservata da ciascun asse ridotto (solo PCA).
+        # Serve a mostrare quanto "si perde" proiettando in 2D/3D.
+        self.explained_variance_ratio_: Optional[np.ndarray] = None
 
     # ── API pubblica ─────────────────────────────────────────────────────────
 
@@ -147,8 +150,13 @@ class DimensionReducer:
                 reduced = self._model.fit_transform(matrix)
             else:
                 reduced = self._model.transform(matrix)
+            self.explained_variance_ratio_ = getattr(
+                self._model, "explained_variance_ratio_", None
+            )
 
         else:  # t-SNE
+            # t-SNE non preserva varianza globale: nessuna metrica di varianza.
+            self.explained_variance_ratio_ = None
             perplexity = min(30, max(2, n_samples - 1))
             self._model = TSNE(
                 n_components=n_comp,

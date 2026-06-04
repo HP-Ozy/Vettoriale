@@ -157,6 +157,62 @@ class TokenEmbedder:
         scores.sort(key=lambda x: x[1], reverse=True)
         return scores[:top_n]
 
+    def analogy(
+        self, a: str, b: str, c: str, top_n: int = 5
+    ) -> List[Tuple[str, float]]:
+        """
+        Aritmetica semantica: risolve l'analogia «a sta a b come c sta a ?».
+
+        Calcola il vettore  target = vec(a) - vec(b) + vec(c)  e restituisce
+        i token più vicini (coseno), escludendo a, b, c.
+
+        Esempio classico:  re - uomo + donna  ≈  regina
+
+        NB: con embedding TF-IDF didattici il risultato è approssimativo;
+        l'obiettivo è *mostrare* il meccanismo, non eguagliare word2vec.
+
+        Returns:
+            lista [(token, similarità_coseno)] ordinata per similarità decrescente
+        """
+        for tok in (a, b, c):
+            if tok not in self.embeddings:
+                return []
+
+        target = (
+            self.embeddings[a] - self.embeddings[b] + self.embeddings[c]
+        )
+
+        exclude = {a, b, c}
+        scores = []
+        for tok, vec in self.embeddings.items():
+            if tok in exclude:
+                continue
+            scores.append((tok, self._cosine(target, vec)))
+
+        scores.sort(key=lambda x: x[1], reverse=True)
+        return scores[:top_n]
+
+    def similarity_matrix(
+        self, tokens: Optional[List[str]] = None
+    ) -> Tuple[List[str], np.ndarray]:
+        """
+        Matrice di similarità coseno fra tutti i token (o un sottoinsieme).
+
+        Returns:
+            (lista_token, matrice NxN con valori in [-1, 1])
+        """
+        toks = [t for t in (tokens or self.embeddings.keys())
+                if t in self.embeddings]
+        n = len(toks)
+        mat = np.zeros((n, n), dtype=np.float32)
+        for i in range(n):
+            for j in range(i, n):
+                sim = 1.0 if i == j else self._cosine(
+                    self.embeddings[toks[i]], self.embeddings[toks[j]]
+                )
+                mat[i, j] = mat[j, i] = sim
+        return toks, mat
+
     def snapshot_tokens(self) -> List[str]:
         """Token disponibili nello storico."""
         return list(self.embeddings.keys())

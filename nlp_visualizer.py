@@ -33,14 +33,17 @@ class EmbeddingVisualizer:
         highlight: Optional[List[str]] = None,
         similar_to: Optional[str] = None,
         similarity_scores: Optional[Dict[str, float]] = None,
+        analogy_path: Optional[Dict[str, str]] = None,
     ) -> go.Figure:
         """
         Scatter statico 2D o 3D dei token.
-        
+
         Args:
             coords: {token: array [x,y] o [x,y,z]}
             highlight: token da evidenziare con bordo
             similar_to: token centrale per visualizzare similarità
+            analogy_path: {"a","b","c","result"} per disegnare il
+                parallelogramma dell'analogia a - b + c ≈ result
         """
         fig = go.Figure()
 
@@ -51,11 +54,47 @@ class EmbeddingVisualizer:
                 self._color_idx += 1
 
         if mode == "2D":
+            self._analogy_arrows_2d(fig, coords, analogy_path)
             self._scatter_2d(fig, coords, tokens, highlight, similarity_scores)
         else:
             self._scatter_3d(fig, coords, tokens, highlight, similarity_scores)
 
         fig.update_layout(**self._base_layout(title, mode))
+        return fig
+
+    def plot_similarity_heatmap(
+        self,
+        tokens: List[str],
+        matrix: np.ndarray,
+        title: str = "Matrice di similarità coseno",
+    ) -> go.Figure:
+        """
+        Heatmap NxN della similarità coseno fra token.
+        Rende esplicito *perché* certi token si raggruppano nello scatter
+        (lo scatter è una proiezione, la heatmap usa i vettori interi).
+        """
+        fig = go.Figure(data=go.Heatmap(
+            z=matrix,
+            x=tokens,
+            y=tokens,
+            colorscale="Viridis",
+            zmin=-1, zmax=1,
+            colorbar=dict(
+                title=dict(text="cos", font=dict(color="#aaa")),
+                tickfont=dict(color="#aaa"),
+            ),
+            hovertemplate="%{y} ↔ %{x}<br>cos = %{z:.3f}<extra></extra>",
+        ))
+        fig.update_layout(
+            title=dict(text=title, font=dict(color="#e0e0e0", size=15)),
+            paper_bgcolor="#0f1117",
+            plot_bgcolor="#0f1117",
+            font=dict(color="#e0e0e0", family="monospace", size=10),
+            margin=dict(l=10, r=10, t=60, b=10),
+            height=560,
+            xaxis=dict(tickfont=dict(color="#aaa"), side="bottom"),
+            yaxis=dict(tickfont=dict(color="#aaa"), autorange="reversed"),
+        )
         return fig
 
     def plot_animated(
@@ -131,6 +170,30 @@ class EmbeddingVisualizer:
             )],
         )
         return fig
+
+    # ── Frecce analogia (parallelogramma) ────────────────────────────────────
+
+    def _analogy_arrows_2d(self, fig, coords, analogy_path):
+        """
+        Disegna due frecce parallele: b→a e c→result.
+        Stessa "direzione semantica" applicata a due punti diversi —
+        è la lettura visiva dell'analogia a - b + c ≈ result.
+        """
+        if not analogy_path:
+            return
+        a, b = analogy_path.get("a"), analogy_path.get("b")
+        c, r = analogy_path.get("c"), analogy_path.get("result")
+        pairs = [(b, a, "#00d4ff"), (c, r, "#ff9f43")]
+        for src, dst, col in pairs:
+            if src in coords and dst in coords:
+                sx, sy = float(coords[src][0]), float(coords[src][1])
+                dx, dy = float(coords[dst][0]), float(coords[dst][1])
+                fig.add_annotation(
+                    x=dx, y=dy, ax=sx, ay=sy,
+                    xref="x", yref="y", axref="x", ayref="y",
+                    showarrow=True, arrowhead=3, arrowsize=1.4,
+                    arrowwidth=2, arrowcolor=col, opacity=0.9,
+                )
 
     # ── Scatter 2D ───────────────────────────────────────────────────────────
 

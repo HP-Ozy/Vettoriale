@@ -54,6 +54,8 @@ if "nlp_coords" not in st.session_state:
     st.session_state.nlp_coords = None
 if "nlp_mode" not in st.session_state:
     st.session_state.nlp_mode = "2D"
+if "nlp_analogy" not in st.session_state:
+    st.session_state.nlp_analogy = None
 
 st.title("📐 Piano degli Assi — Visualizzatore Vettoriale")
 
@@ -305,6 +307,53 @@ with tab_nlp:
         else:
             st.caption("Addestra prima gli embedding 👆")
 
+        st.divider()
+
+        # --- Aritmetica semantica (analogie) ---
+        st.subheader("➗ Aritmetica semantica")
+        st.caption("Analogia: **A − B + C ≈ ?**  (es. re − uomo + donna ≈ regina)")
+        if st.session_state.embedder and len(st.session_state.embedder.embeddings) >= 4:
+            toks_an = sorted(st.session_state.embedder.embeddings.keys())
+            a1, a2, a3 = st.columns(3)
+            tok_a = a1.selectbox("A", toks_an, key="an_a")
+            tok_b = a2.selectbox("B", toks_an, key="an_b",
+                                 index=min(1, len(toks_an) - 1))
+            tok_c = a3.selectbox("C", toks_an, key="an_c",
+                                 index=min(2, len(toks_an) - 1))
+            if st.button("➗ Calcola analogia", use_container_width=True):
+                res = st.session_state.embedder.analogy(tok_a, tok_b, tok_c, top_n=5)
+                if res:
+                    st.session_state.nlp_analogy = {
+                        "a": tok_a, "b": tok_b, "c": tok_c,
+                        "result": res[0][0], "ranking": res,
+                    }
+                else:
+                    st.session_state.nlp_analogy = None
+                    st.warning("Token non validi.")
+                st.rerun()
+
+            an = st.session_state.nlp_analogy
+            if an:
+                st.markdown(
+                    f"**{an['a']} − {an['b']} + {an['c']} ≈ "
+                    f"<span style='color:#ff9f43'>{an['result']}</span>**",
+                    unsafe_allow_html=True,
+                )
+                for tok, score in an["ranking"]:
+                    bar = "█" * int(max(0, score) * 20)
+                    st.markdown(
+                        f'<div class="token-pill" style="background:#1e2130;color:#aaa">'
+                        f'<span style="color:#ff9f43">{tok}</span> '
+                        f'<span style="color:#666">{bar}</span> '
+                        f'<span style="color:#ffd93d">{score:.3f}</span></div>',
+                        unsafe_allow_html=True,
+                    )
+                if st.button("✖ Pulisci analogia", use_container_width=True):
+                    st.session_state.nlp_analogy = None
+                    st.rerun()
+        else:
+            st.caption("Servono almeno 4 token addestrati 👆")
+
     # ── Pannello visualizzazione ────────────────────────────────────────────
     with right:
         viz: EmbeddingVisualizer = st.session_state.visualizer
@@ -312,8 +361,9 @@ with tab_nlp:
         emb_state: TokenEmbedder = st.session_state.embedder
         nlp_mode_cur = st.session_state.get("nlp_mode", "2D")
 
-        view_tab1, view_tab2, view_tab3 = st.tabs(
-            ["📍 Scatter statico", "🎬 Animazione evoluzione", "🔢 Token & coordinate"]
+        view_tab1, view_tab2, view_tab4, view_tab3 = st.tabs(
+            ["📍 Scatter statico", "🎬 Animazione evoluzione",
+             "🔥 Matrice similarità", "🔢 Token & coordinate"]
         )
 
         # Scatter statico
@@ -321,9 +371,15 @@ with tab_nlp:
             if coords and len(coords) >= 2:
                 highlight_tok = None
                 sim_scores = None
+                analogy_path = None
 
-                # Se l'utente ha appena cercato simili
-                if "sim_query" in st.session_state and emb_state:
+                an = st.session_state.nlp_analogy
+                if an and all(an[k] in coords for k in ("a", "b", "c", "result")):
+                    # L'analogia ha la precedenza: evidenzia i 4 token e le frecce
+                    analogy_path = {k: an[k] for k in ("a", "b", "c", "result")}
+                    highlight_tok = [an["a"], an["b"], an["c"], an["result"]]
+                elif "sim_query" in st.session_state and emb_state:
+                    # Altrimenti, se l'utente ha cercato token simili
                     ht = st.session_state.sim_query
                     if ht in coords:
                         similar = emb_state.get_similar(ht, 10)
@@ -336,13 +392,31 @@ with tab_nlp:
                     title="Embedding Token — Spazio Ridotto",
                     highlight=highlight_tok,
                     similarity_scores=sim_scores,
+                    analogy_path=analogy_path,
                 )
                 st.plotly_chart(fig_static, use_container_width=True)
-                st.caption(
-                    f"**{len(coords)} token** proiettati con "
-                    f"**{st.session_state.get('red_method', 'PCA')}** in "
-                    f"**{nlp_mode_cur}**"
-                )
+
+                # Varianza spiegata: quanto della struttura sopravvive alla proiezione
+                evr = getattr(st.session_state.reducer, "explained_variance_ratio_", None)
+                if evr is not None and len(evr) > 0:
+                    tot = float(np.sum(evr)) * 100
+                    per_axis = " + ".join(f"{v*100:.0f}%" for v in evr)
+                    st.caption(
+                        f"**{len(coords)} token** · **PCA {nlp_mode_cur}** · "
+                        f"varianza spiegata: **{tot:.0f}%** ({per_axis}). "
+                        f"Il resto va perso nella proiezione."
+                    )
+                else:
+                    st.caption(
+                        f"**{len(coords)} token** proiettati con "
+                        f"**{st.session_state.get('red_method', 'PCA')}** in "
+                        f"**{nlp_mode_cur}** · t-SNE non preserva varianza globale."
+                    )
+                if analogy_path:
+                    st.caption(
+                        "💡 Le due frecce mostrano la stessa relazione semantica: "
+                        f"**{an['b']}→{an['a']}** (blu) e **{an['c']}→{an['result']}** (arancio)."
+                    )
             else:
                 st.info("👈 Addestra gli embedding per vedere lo scatter.")
 
@@ -368,6 +442,27 @@ with tab_nlp:
                     st.info("Snapshot non sufficienti per l'animazione.")
             elif emb_state and len(emb_state.history) == 1:
                 st.info("Aggiungi almeno una frase di contesto per vedere l'evoluzione.")
+            else:
+                st.info("👈 Addestra gli embedding prima.")
+
+        # Matrice di similarità (heatmap)
+        with view_tab4:
+            if emb_state and len(emb_state.embeddings) >= 2:
+                all_toks = sorted(emb_state.embeddings.keys())
+                max_n = min(len(all_toks), 40)
+                n_show = st.slider(
+                    "Numero di token nella matrice", 2, max(2, max_n),
+                    min(15, max_n), key="heat_n",
+                    help="La similarità è calcolata sui vettori interi, non sulla proiezione.",
+                )
+                toks_sel, mat = emb_state.similarity_matrix(all_toks[:n_show])
+                fig_heat = viz.plot_similarity_heatmap(toks_sel, mat)
+                st.plotly_chart(fig_heat, use_container_width=True)
+                st.caption(
+                    "Giallo = simili, viola = distanti. A differenza dello scatter "
+                    "(proiezione 2D/3D), questa usa i **vettori completi**: è la "
+                    "verità sul clustering."
+                )
             else:
                 st.info("👈 Addestra gli embedding prima.")
 
